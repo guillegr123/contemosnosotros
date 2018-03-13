@@ -1,6 +1,5 @@
-# coding=utf-8
 # Fuentes:
-# - Corregir alineación: https://www.pyimagesearch.com/2017/02/20/text-skew-correction-opencv-python/
+# - Corregir alineacion: https://www.pyimagesearch.com/2017/02/20/text-skew-correction-opencv-python/
 # - Rellenar bordes: https://www.learnopencv.com/filling-holes-in-an-image-using-opencv-python-c/
 # - Auto-cortar:
 #   - https://stackoverflow.com/questions/13538748/crop-black-edges-with-opencv
@@ -11,26 +10,35 @@ import numpy as np
 import argparse
 import cv2
  
-# Construir el intérprete de argumentos, y extraer argumentos
+# Construir el interprete de argumentos, y extraer argumentos
 ap = argparse.ArgumentParser()
 ap.add_argument("-i", "--image", required=True,
 	help="path to input image file")
 ap.add_argument("-o", "--out", required=True,
 	help="path to output image file")
-ap.add_argument("-n", "--negativeout", required=True,
-	help="path to output negative image file")
 args = vars(ap.parse_args())
  
 imageNameOut = args["out"]
-imageNameNegativeOut = args["negativeout"]
 
 # Cargar la imagen inicial del disco
 imageName = args["image"]
 image = cv2.imread(imageName)
 
+"""
+# Eliminar "islas" de pixeles
+img_bw = 255*(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) > 5).astype('uint8')
+
+se1 = cv2.getStructuringElement(cv2.MORPH_RECT, (5,5))
+se2 = cv2.getStructuringElement(cv2.MORPH_RECT, (2,2))
+mask = cv2.morphologyEx(img_bw, cv2.MORPH_CLOSE, se1)
+mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, se2)
+
+mask = np.dstack([mask, mask, mask]) / 255
+cleaned = image * mask
+"""
 
 # Tratar de remover "ruido"
-image = cv2.fastNlMeansDenoisingColored(image,None,10,10,7,21)
+# image = cv2.fastNlMeansDenoisingColored(image,None,10,10,7,21)
 
 # Convertir la imagen a escala de grises, e invertir los
 # colores de fondo y frente para asegurar que el frente
@@ -38,13 +46,15 @@ image = cv2.fastNlMeansDenoisingColored(image,None,10,10,7,21)
 gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 gray = cv2.bitwise_not(gray)
  
-# Limitar la imagen, estableciendo todos los píxeles del
+# Limitar la imagen, estableciendo todos los pixeles del
 # frente a 255 (blanco total), y los de fondo a 0 (negro total)
 thresh = cv2.threshold(gray, 0, 255,
 	cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
 
-# Crear máscara para rellenar colores.
-# Nótese que el tamaño debe ser 2 píxeles más grande que el de la imagen.
+cv2.imwrite("step1.png",thresh)
+
+# Crear mascara para rellenar colores.
+# Notese que el tamano debe ser 2 pixeles mas grande que el de la imagen.
 h, w = thresh.shape[:2]
 mask = np.zeros((h+2, w+2), np.uint8)
 
@@ -59,26 +69,26 @@ cv2.floodFill(thresh, mask, (w-1,h-1), 0)
 # Tratar de remover "ruido" otra vez
 # thresh = cv2.fastNlMeansDenoising(thresh)
 
-#cv2.imwrite("step1.png",thresh)
+cv2.imwrite("step2.png",thresh)
 
-# Tomar las coordenadas (x, y) de todos los píxeles
+# Tomar las coordenadas (x, y) de todos los pixeles
 # con valores mayores o iguales a cero, y usarlas para
 # calcular una caja rotada que delimite todas las
 # coordenadas
 coords = np.column_stack(np.where(thresh > 0))
 angle = cv2.minAreaRect(coords)[-1]
 
-# Mostrar el ángulo de corrección "crudo"
+# Mostrar el angulo de correccion "crudo"
 print("[INFO] Raw angle: {:.3f}".format(angle))
 
-# La función `cv2.minAreaRect` retorna valores en el rango
-# [-90, 0]; como el rectángulo rota en el sentido de las
-# agujas del reloj, el ángulo obtenido tiende a cero. En
-# este caso especial debemos sumar 90 grados al ángulo.
+# La funcion `cv2.minAreaRect` retorna valores en el rango
+# [-90, 0]; como el rectangulo rota en el sentido de las
+# agujas del reloj, el angulo obtenido tiende a cero. En
+# este caso especial debemos sumar 90 grados al angulo.
 if angle < -45:
 	angle = -(90 + angle)
  
-# De lo contrario, solo basta tomar el inverso del ángulo
+# De lo contrario, solo basta tomar el inverso del angulo
 # para hacerlo positivo
 else:
 	angle = -angle
@@ -90,7 +100,7 @@ M = cv2.getRotationMatrix2D(center, angle, 1.0)
 thresh = cv2.warpAffine(thresh, M, (w, h),
 	flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
 
-# Mostrar el ángulo de corrección final
+# Mostrar el angulo de correccion final
 print("[INFO] Angle: {:.3f}".format(angle))
 
 # cv2.imwrite("step2.png",rotated)
@@ -133,7 +143,7 @@ small = cv2.resize(cropThresh, (0,0), fx=0.6, fy=0.6)
 # Mostrar la imagen final
 # cv2.imshow("Final", small)
 
-# Guardar imágenes
+# Guardar imagenes
 cv2.imwrite(imageNameOut,small, [cv2.IMWRITE_PNG_COMPRESSION, 9])
 
 #cv2.imwrite(imageNameNegativeOut,cropThresh)

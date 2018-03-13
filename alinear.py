@@ -4,6 +4,8 @@
 # - Auto-cortar:
 #   - https://stackoverflow.com/questions/13538748/crop-black-edges-with-opencv
 #   - https://stackoverflow.com/questions/37803903/opencv-and-python-for-auto-cropping
+# - Opening, para eliminar islas de pixeles antes de calcular rotacion y corte:
+#   https://docs.opencv.org/3.0-beta/doc/py_tutorials/py_imgproc/py_morphological_ops/py_morphological_ops.html
 
 # Importar los paquetes necesarios
 import numpy as np
@@ -44,14 +46,14 @@ cleaned = image * mask
 # colores de fondo y frente para asegurar que el frente
 # sea "blanco" y el fondo "negro"
 gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-gray = cv2.bitwise_not(gray)
+gray_inverted = cv2.bitwise_not(gray)
  
 # Limitar la imagen, estableciendo todos los pixeles del
 # frente a 255 (blanco total), y los de fondo a 0 (negro total)
-thresh = cv2.threshold(gray, 0, 255,
+thresh = cv2.threshold(gray_inverted, 0, 255,
 	cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
 
-cv2.imwrite("step1.png",thresh)
+# cv2.imwrite("step1.png",thresh)
 
 
 
@@ -70,7 +72,8 @@ cv2.floodFill(thresh, mask, (w-1,h-1), 0)
 
 
 
-# Obtener islas de pixeles
+# Borrar islas de pixeles
+"""
 thresh_inverted = cv2.bitwise_not(thresh)
 kernel1 = np.array([[0, 0, 0],
                     [0, 1, 0],
@@ -87,7 +90,11 @@ cv2.imwrite('isolated.png', hitormiss)
 
 hitormiss_comp = cv2.bitwise_not(hitormiss)  # could just use 255-img
 thresh = cv2.bitwise_and(thresh, thresh, mask=hitormiss_comp)
-#thresh = cv2.bitwise_not(thresh)
+"""
+
+# Erosion y dilatacion, para eliminar islas de pixeles
+kernel = np.ones((5,5),np.uint8)
+thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
 
 
 
@@ -95,7 +102,7 @@ thresh = cv2.bitwise_and(thresh, thresh, mask=hitormiss_comp)
 # Tratar de remover "ruido" otra vez
 # thresh = cv2.fastNlMeansDenoising(thresh)
 
-cv2.imwrite("step2.png",thresh)
+# cv2.imwrite("step2.png",thresh)
 
 # Tomar las coordenadas (x, y) de todos los pixeles
 # con valores mayores o iguales a cero, y usarlas para
@@ -125,6 +132,8 @@ center = (w // 2, h // 2)
 M = cv2.getRotationMatrix2D(center, angle, 1.0)
 thresh = cv2.warpAffine(thresh, M, (w, h),
 	flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+gray = cv2.warpAffine(gray, M, (w, h),
+	flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
 
 # Mostrar el angulo de correccion final
 print("[INFO] Angle: {:.3f}".format(angle))
@@ -140,7 +149,7 @@ maxH, maxW = thresh.shape[:2]
 best_box=[-1,-1,-1,-1]
 for c in contours:
    x,y,w,h = cv2.boundingRect(c)
-   print("[INFO] Contour rectangle: {x}, {y}, {w}, {h}".format(x=x, y=y,w=w, h=h))
+   #print("[INFO] Contour rectangle: {x}, {y}, {w}, {h}".format(x=x, y=y,w=w, h=h))
    if best_box[0] < 0:
        best_box=[x,y,x+w,y+h]
    else:
@@ -158,13 +167,10 @@ x,y,w,h = best_box
 print("[INFO] Final contour rectangle: {x}, {y}, {w}, {h}".format(x=x, y=y,w=w, h=h))
 
 # Cortar imagen negativa rotada
-cropThresh = thresh[y:h,x:w]
-
-# Re-invertir
-cropThresh = cv2.bitwise_not(cropThresh)
+gray = gray[y:h,x:w]
 
 # Reducir tamano
-small = cv2.resize(cropThresh, (0,0), fx=0.6, fy=0.6) 
+small = cv2.resize(gray, (0,0), fx=0.6, fy=0.6) 
 
 # Mostrar la imagen final
 # cv2.imshow("Final", small)

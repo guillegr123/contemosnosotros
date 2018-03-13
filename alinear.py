@@ -53,6 +53,8 @@ thresh = cv2.threshold(gray, 0, 255,
 
 cv2.imwrite("step1.png",thresh)
 
+
+
 # Crear mascara para rellenar colores.
 # Notese que el tamano debe ser 2 pixeles mas grande que el de la imagen.
 h, w = thresh.shape[:2]
@@ -65,6 +67,30 @@ cv2.floodFill(thresh, mask, (0,0), 0)
 cv2.floodFill(thresh, mask, (0,h-1), 0)
 cv2.floodFill(thresh, mask, (w-1,0), 0)
 cv2.floodFill(thresh, mask, (w-1,h-1), 0)
+
+
+
+# Obtener islas de pixeles
+thresh_inverted = cv2.bitwise_not(thresh)
+kernel1 = np.array([[0, 0, 0],
+                    [0, 1, 0],
+                    [0, 0, 0]], np.uint8)
+kernel2 = np.array([[1, 1, 1],
+                    [1, 0, 1],
+                    [1, 1, 1]], np.uint8)
+
+hitormiss1 = cv2.morphologyEx(thresh, cv2.MORPH_ERODE, kernel1)
+hitormiss2 = cv2.morphologyEx(thresh_inverted, cv2.MORPH_ERODE, kernel2)
+hitormiss = cv2.bitwise_and(hitormiss1, hitormiss2)
+
+cv2.imwrite('isolated.png', hitormiss)
+
+hitormiss_comp = cv2.bitwise_not(hitormiss)  # could just use 255-img
+thresh = cv2.bitwise_and(thresh, thresh, mask=hitormiss_comp)
+#thresh = cv2.bitwise_not(thresh)
+
+
+
 
 # Tratar de remover "ruido" otra vez
 # thresh = cv2.fastNlMeansDenoising(thresh)
